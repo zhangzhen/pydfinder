@@ -1,5 +1,5 @@
 import unittest
-from dfinder2 import overlap_checker
+from pydfinder import overlap_checker
 
 class TestOverlapChecker(unittest.TestCase):
 
