@@ -13,25 +13,27 @@ URL: https://stepic.org/Bioinformatics-Algorithms-2/The-Changing-Faces-of-Sequen
 import itertools
 import operator
 
+import align
+
 def hamming(str1, str2):
     assert len(str1) == len(str2), "length should be equal:\n{}\n{}".format(str1, str2)
     #ne = str.__ne__  ## this is surprisingly slow
     ne = operator.ne
     return sum(itertools.imap(ne, str1, str2))
 
-def fitting_alignment(v,w):
+def fitting_alignment(v, w, score_param):
     '''Returns the fitting alignment of strings v and w, along with the associated score.'''
     # Initialize the matrices.
     S = [[0 for j in xrange(len(w)+1)] for i in xrange(len(v)+1)]
     backtrack = [[0 for j in xrange(len(w)+1)] for i in xrange(len(v)+1)]
 
     for j in xrange(1, len(w)+1):
-        S[0][j] = -3*j
+        S[0][j] = -score_param.gap*j
 
     # Fill in the Score and Backtrack matrices.
     for i in xrange(1, len(v)+1):
         for j in xrange(1, len(w)+1):
-            scores = [S[i-1][j] - 3, S[i][j-1] - 3, S[i-1][j-1] + [-1, 1][v[i-1] == w[j-1]]]
+            scores = [S[i-1][j] - score_param.gap, S[i][j-1] - score_param.gap, S[i-1][j-1] + score_param.matchchar(v[i-1], w[j-1])]
             S[i][j] = max(scores)
             backtrack[i][j] = scores.index(S[i][j])
 
@@ -121,12 +123,28 @@ def fitting_alignment2(v, w, k, m, e):
 
 class TargetSequence(object):
     """docstring for TargetSequence"""
-    def __init__(self, l_pos, seq):
-        self.l_pos = l_pos
+    def __init__(self, g_pos, seq):
+        self.g_pos = g_pos
         self.seq = seq
         
+    def to_global(self, aln_pos):
+        return self.g_pos + aln_pos
 
-class FiveEndSRead(object):
+class SoftClippingRead(object):
+    """docstring for SoftClippingRead"""
+    def __init__(self, id, g_pos, clip_len, seq, seq_qual, map_qual):
+        self.id = id
+        self.g_pos = g_pos
+        self.clip_len = clip_len
+        self.seq = seq
+        self.seq_qual = seq_qual
+        self.map_qual = map_qual
+
+    def __len__(self):
+        return len(seq)
+        
+
+class FiveEndSoftClippingRead(object):
     """docstring for FiveEndSRead"""
     def __init__(self, id, l_pos, tail, seq):
         self.id = id
@@ -137,10 +155,10 @@ class FiveEndSRead(object):
     def __len__(self):
         return len(seq)
 
-class FiveEndForwardSRead(FiveEndSRead):
+class ForwardFiveEndSoftClippingRead(FiveEndSoftClippingRead):
     """docstring for FiveEndForwardSRead"""
     def __init__(self, id, l_pos, tail, seq):
-        super(FiveEndForwardSRead, self).__init__(id, l_pos, tail, seq)
+        super(FiveEndForwardSoftClippingRead, self).__init__(id, l_pos, tail, seq)
 
     def s_pos(self):
         return self.l_pos + self.tail
@@ -173,21 +191,38 @@ class ReadTargetSequence(object):
 
 class AlignmentResult(object):
     """docstring for AlignmentResult"""
-    def __init__(self, v_s, v_e, w_s, w_e, v_aligned, w_aligned, score, edit_dist):
+    def __init__(self, v_s, v_e, w_s, w_e, v_aligned, w_aligned, score):
         self.v_s = v_s
-        self.v_e = v_s
+        self.v_e = v_e
         self.w_s = w_s
         self.w_e = w_e
         self.v_aligned = v_aligned
         self.w_aligned = w_aligned
         self.score = score
-        self.edit_dist = edit_dist
 
-    def error_rate(self):
-        pass
+    def __repr__(self):
+        return 'AlignmentResult(v_s={}, v_e={}, w_s={}, w_e={}, v_aligned={}, w_aligned={}, score={})'.format(
+            self.v_s,
+            self.v_e,
+            self.w_s,
+            self.w_e,
+            self.v_aligned,
+            self.w_aligned,
+            self.score
+            )
+
+    def __eq__(self, other):
+        return (self.v_s, self.v_e, self.w_s, self.w_e, self.v_aligned, self.w_aligned, self.score) == \
+        (other.v_s, other.v_e, other.w_s, other.w_e, other.v_aligned, other.w_aligned, other.score)
+
+    def percent_identity(self):
+        return 1 - hamming(self.v_aligned, self.w_aligned) / float(len(self.v_aligned))
 
     def alignment_length(self):
-        pass
+        return self.w_e - self.w_s
+
+    def is_valid(self, max_error_rate, min_aln_len):
+        return (1 - self.percent_identity()) <= max_error_rate and self.alignment_length() >= min_aln_len
         
 def fetch_target_seq(region):
     pass

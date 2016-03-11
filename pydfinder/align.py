@@ -18,17 +18,17 @@ class ScoreParam(object):
         self.match = match
         self.mismatch = mismatch
 
-    def matchchar(self, a,b):
+    def matchchar(self, a, b):
         """Return the score for aligning character a with b"""
         assert len(a) == len(b) == 1
-        if a==b:
+        if a == b:
             return self.match
         else:
             return self.mismatch
 
     def __str__(self):
         return "match = %d; mismatch = %d; gap_start = %d; gap_extend = %d" % (
-                self.match, self.mismatch, self.gap_start, self.gap
+            self.match, self.mismatch, self.gap_start, self.gap
         )
 
 
@@ -41,12 +41,12 @@ class Aligner(object):
         self.size_w = len(w)
 
     def local_align(self, score_param):
-        _calc_score_matrix(score_param)
-        _calc_max_matrix()
-        max_i, max_j = _find_max_pos()
-        v_aligned, w_aligned = backtrace(max_i, max_j)
+        self._calc_score_matrix(score_param)
+        self._calc_max_matrix()
+        max_i, max_j = self._find_max_pos()
+        v_aligned, w_aligned = self._backtrace(max_i, max_j)
         return (max_i, max_j), v_aligned, w_aligned
-    
+
     def _calc_score_matrix(self, score_param):
         self.S = make_matrix(self.size_v + 1, self.size_w + 1)
         self.S_backtrace = make_matrix(self.size_v + 1, self.size_w + 1)
@@ -78,6 +78,8 @@ class Aligner(object):
                 if scores.index(self.S[i][j]) != 0:
                     self.M_backtrace[i][j] = scores.index(self.S[i][j]) + 1
 
+        print '\n'.join(' '.join(str(elt) for elt in row) for row in self.M_backtrace)
+
     def _find_max_pos(self):
         max_score = self.S[self.size_v][self.size_w]
 
@@ -95,13 +97,13 @@ class Aligner(object):
         v_aligned, w_aligned = self.v[:j], self.w[:i]
 
         while self.S_backtrace[i][j] != 0 and i*j != 0:
-            if backtrace[i][j] == VERTICAL:
+            if self.S_backtrace[i][j] == VERTICAL:
                 i -= 1
                 w_aligned = insert_indel(w_aligned, j)
-            elif backtrace[i][j] == HORIZONTAL:
+            elif self.S_backtrace[i][j] == HORIZONTAL:
                 j -= 1
                 v_aligned = insert_indel(v_aligned, i)
-            elif backtrace[i][j] == DIAGONAL:
+            elif self.S_backtrace[i][j] == DIAGONAL:
                 i -= 1
                 j -= 1
 
