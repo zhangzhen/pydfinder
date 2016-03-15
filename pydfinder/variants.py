@@ -21,12 +21,8 @@ class GenomePosition(object):
             return (self.ref_name, self.pos) == (other.ref_name, other.pos)
         return NotImplemented
 
-    def postion(self):
-        return self
-
-    def to_genome_region(self, slop=0):
-        return GenomeRegion(GenomePosition(self.ref_name, self.pos - slop),
-            GenomePosition(self.ref_name, self.pos + slop))
+    def genome_position_with_ci(self, slop):
+        return GenomePositionWithCi(self, Interval(-slop, slop))
 
 
 class Interval(object):
@@ -46,9 +42,9 @@ class Interval(object):
 
     def overlaps(self, other):
         return (self.a >= other.a and self.a < other.b) or \
-        (other.a >= self.a and other.a < self.b)
+            (other.a >= self.a and other.a < self.b)
 
-    def reciprocal_overlap(self, other, threshold):
+    def reciprocal_overlaps(self, other, threshold):
         if not self.overlaps(other):
             return False
 
@@ -56,7 +52,7 @@ class Interval(object):
         n = len(self)
         m = len(other)
 
-        return float(o)/max(n,m) >= threshold
+        return float(o)/max(n, m) >= threshold
 
 
 class GenomePositionWithCi(object):
@@ -71,11 +67,10 @@ class GenomePositionWithCi(object):
         return NotImplemented
 
     def to_genome_region(self):
-        return GenomeRegion(GenomePosition(self.genome_pos.ref_name, self.genome_pos.pos + self.confidence_interval.a),
-            GenomePosition(self.genome_pos.ref_name, self.genome_pos.pos + self.confidence_interval.b))
-
-    def position(self):
-        pass
+        return GenomeRegion(
+            GenomePosition(self.genome_pos.ref_name, self.genome_pos.pos + self.confidence_interval.a),
+            GenomePosition(self.genome_pos.ref_name, self.genome_pos.pos + self.confidence_interval.b)
+        )
 
 
 class GenomeRegion(object):
@@ -94,10 +89,10 @@ class GenomeRegion(object):
             return False
         return Interval(self.start.pos, self.end.pos).overlaps(Interval(other.start.pos, other.end.pos))
 
-    def reciprocal_overlap(self, other, threshold):
+    def reciprocal_overlaps(self, other, threshold):
         if self.start.ref_name != other.start.ref_name or self.end.ref_name != other.end.ref_name:
             return False
-        return Interval(self.start.pos, self.end.pos).reciprocal_overlap(Interval(other.start.pos, other.end.pos), threshold)
+        return Interval(self.start.pos, self.end.pos).reciprocal_overlaps(Interval(other.start.pos, other.end.pos), threshold)
 
 
 class Variant(object):
@@ -118,8 +113,19 @@ class Variant(object):
                 (other.name, other.pos1, other.pos2, other.micro_hom_seq, other.micro_ins_seq)
         return NotImplemented
 
-    def make_genome_region(self):
-        return GenomeRegion(self.pos1.postion(), self.pos2.postion())
+    def _genome_region(self):
+        return GenomeRegion(self.pos1.genome_pos, self.pos2.genome_pos)
+
+    def matched_with_both_overlaps(self, other):
+        if isinstance(other, self.__class__):
+            return self.pos1.to_genome_region().overlaps(other.pos1.to_genome_region()) and \
+                self.pos2.to_genome_region().overlaps(other.pos2.to_genome_region())
+        return NotImplemented
+
+    def matched_with_reciprocal_overlap(self, other, threshold):
+        if isinstance(other, self.__class__):
+            return self._genome_region().reciprocal_overlaps(other._genome_region(), threshold)
+        return NotImplemented
 
     @abstractmethod
     def variant_type(self):
@@ -199,6 +205,10 @@ class VariantFile(object):
 class SvsimBedpeFile(VariantFile):
     """docstring for SvsimBedpeFile"""
 
+    def __init__(self, filename, slop):
+        super(SvsimBedpeFile, self).__init__(filename)
+        self.slop = slop
+
     def get_variant_type(self, data):
         variant_types = ['DEL', 'INS', 'INV', 'DUP']
         pattern = '(?P<variant_type>{})'.format('|'.join(variant_types))
@@ -208,8 +218,8 @@ class SvsimBedpeFile(VariantFile):
     def data_to_deletion(self, data):
         return Deletion(
             data[6],
-            GenomePosition(data[0], int(data[2])),
-            GenomePosition(data[3], int(data[5]))
+            GenomePosition(data[0], int(data[2])).genome_position_with_ci(self.slop),
+            GenomePosition(data[3], int(data[5])).genome_position_with_ci(self.slop)
         )
 
     def data_to_insertion(self, data):
