@@ -78,6 +78,20 @@ class TestVariant(object):
 
         assert not d1.matched_with_both_overlaps(d2)
 
+    def test_matched(self):
+        d1 = variants.Deletion(
+            'DELL:10518:1:9907630_9918147::1::27',
+            variants.GenomePosition('1', 10052764).genome_position_with_ci(self.slop),
+            variants.GenomePosition('1', 10063283).genome_position_with_ci(self.slop)
+        )
+        d2 = variants.Deletion(
+            'DEL.1.5F',
+            variants.GenomePositionWithCi(variants.GenomePosition('1', 10052714), variants.Interval(0, 26)),
+            variants.GenomePositionWithCi(variants.GenomePosition('1', 10063233), variants.Interval(0, 26))
+        )
+
+        assert d1.matched_with_both_overlaps(d2)
+
     @classmethod
     def teardown_class(cls):
         pass

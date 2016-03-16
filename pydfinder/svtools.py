@@ -7,8 +7,14 @@ import os
 from functools import wraps
 from docopt import docopt
 from schema import Schema, And, Or, Use, SchemaError
+import variants
+import evaluate
 
 __version__ = '0.1.0'
+
+Tools = {
+    'sprites': variants.SpritesBedpeFile
+}
 
 
 def argparsed(func):
@@ -47,13 +53,13 @@ Options:
   <file2>       The file of results obtained by <tool2>.
     """
 
-    tools = ('sprites', 'lumpy', 'pindel')
     schema = Schema({
         '-r': os.path.isfile,
-        '<tool1>': lambda s: s in tools,
+        '<tool1>': And(Use(str.lower), lambda s: s in Tools.keys()),
         '<file1>': os.path.isfile,
-        '<tool2>': lambda s: s in tools,
-        '<file2>': os.path.isfile
+        '<tool2>': And(Use(str.lower), lambda s: s in Tools.keys()),
+        '<file2>': os.path.isfile,
+        'diff': True
     })
 
     try:
@@ -61,8 +67,11 @@ Options:
     except SchemaError as e:
         exit(e)
 
-    print args
+    truth = evaluate.get_variants(variants.SvsimBedpeFile, args['-r'], 50)
+    pred1 = evaluate.get_variants(Tools[args['<tool1>']], args['<file1>'])
+    pred2 = evaluate.get_variants(Tools[args['<tool2>']], args['<file2>'])
 
+    evaluate.compare_variants(truth, pred1, pred2, lambda v1, v2: v1.matched_with_both_overlaps(v2))
 
 def help(argv):
     if len(argv) > 1:

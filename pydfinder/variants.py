@@ -2,6 +2,10 @@ from abc import ABCMeta, abstractmethod
 import re
 
 
+def natural_key(s):
+    return [int(c) if c.isdigit() else c for c in re.split(r'(\d+)', s)]
+
+
 class VariantTypes(object):
     """docstring for VariantType"""
     DEL = 0
@@ -21,6 +25,18 @@ class GenomePosition(object):
             return (self.ref_name, self.pos) == (other.ref_name, other.pos)
         return NotImplemented
 
+    def __lt__(self, other):
+        if isinstance(other, self.__class__):
+            return (natural_key(self.ref_name), self.pos) < \
+                (natural_key(other.ref_name), other.pos)
+        return NotImplemented
+
+    def __hash__(self):
+        return hash((self.ref_name, self.pos))
+
+    def __str__(self):
+        return '{}:{}'.format(self.ref_name, self.pos)
+
     def genome_position_with_ci(self, slop):
         return GenomePositionWithCi(self, Interval(-slop, slop))
 
@@ -39,6 +55,9 @@ class Interval(object):
 
     def __len__(self):
         return self.b - self.a
+
+    def __str__(self):
+        return '[{}, {}]'.format(self.a, self.b)
 
     def overlaps(self, other):
         return (self.a >= other.a and self.a < other.b) or \
@@ -65,6 +84,17 @@ class GenomePositionWithCi(object):
         if isinstance(other, self.__class__):
             return (self.genome_pos, self.confidence_interval) == (other.genome_pos, other.confidence_interval)
         return NotImplemented
+
+    def __lt__(self, other):
+        if isinstance(other, self.__class__):
+            return self.genome_pos < other.genome_pos
+        return NotImplemented
+
+    def __str__(self):
+        return '{}, {}'.format(self.genome_pos, self.confidence_interval)
+
+    def __hash__(self):
+        return hash(self.genome_pos)
 
     def to_genome_region(self):
         return GenomeRegion(
@@ -108,24 +138,31 @@ class Variant(object):
         self.micro_ins_seq = micro_ins_seq
 
     def __eq__(self, other):
-        if isinstance(other, self.__class__):
-            return (self.name, self.pos1, self.pos2, self.micro_hom_seq, self.micro_ins_seq) == \
-                (other.name, other.pos1, other.pos2, other.micro_hom_seq, other.micro_ins_seq)
-        return NotImplemented
+        return (self.variant_type(), self.pos1, self.pos2) == \
+            (other.variant_type(), other.pos1, other.pos2)
+
+    def __lt__(self, other):
+        return (self.pos1, self.pos2) < (other.pos1, other.pos2)
+
+    def __hash__(self):
+        return hash((self.variant_type(), self.pos1, self.pos2))
+
+    def __str__(self):
+        return '{}, {}, {}'.format(self.pos1, self.pos2, self.name)
 
     def _genome_region(self):
         return GenomeRegion(self.pos1.genome_pos, self.pos2.genome_pos)
 
     def matched_with_both_overlaps(self, other):
-        if isinstance(other, self.__class__):
-            return self.pos1.to_genome_region().overlaps(other.pos1.to_genome_region()) and \
-                self.pos2.to_genome_region().overlaps(other.pos2.to_genome_region())
-        return NotImplemented
+        if self.variant_type() != other.variant_type():
+            return False
+        return self.pos1.to_genome_region().overlaps(other.pos1.to_genome_region()) and \
+            self.pos2.to_genome_region().overlaps(other.pos2.to_genome_region())
 
     def matched_with_reciprocal_overlap(self, other, threshold):
-        if isinstance(other, self.__class__):
-            return self._genome_region().reciprocal_overlaps(other._genome_region(), threshold)
-        return NotImplemented
+        if self.variant_type() != other.variant_type():
+            return False
+        return self._genome_region().reciprocal_overlaps(other._genome_region(), threshold)
 
     @abstractmethod
     def variant_type(self):
@@ -158,7 +195,6 @@ class VariantFile(object):
         for line in self._file_obj:
             if self.is_valid_line(line):
                 data = self.line_to_data(line)
-                print data
                 variant_type = self.get_variant_type(data)
                 if variant_type == VariantTypes.DEL:
                     yield self.data_to_deletion(data)
@@ -270,9 +306,3 @@ class SpritesBedpeFile(VariantFile):
 
     def data_to_duplication(self, data):
         pass
-
-
-def get_variants(cls, filename):
-    with cls(filename) as f:
-        for variant in f:
-            yield variant
