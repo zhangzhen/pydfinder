@@ -1,6 +1,6 @@
 def _find_matches(truth_variants, predicted_variants, matcher):
     return ((truth, predicted) for truth in truth_variants for predicted in predicted_variants
-        if matcher(truth, predicted))
+            if matcher(truth, predicted))
 
 
 def _find_no_matches(truth_variants, predicted_variants, matcher):
@@ -31,7 +31,7 @@ def compare_variants(truth, pred1, pred2, matcher):
         (a for a, b in matches1),
         (a for a, b in matches2)
     )
-    print ''
+    print '\n'
     no_matches1 = _find_no_matches(truth, pred1, matcher)
     no_matches2 = _find_no_matches(truth, pred2, matcher)
     _show_difference(no_matches1, no_matches2)

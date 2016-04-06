@@ -73,6 +73,7 @@ Options:
 
     evaluate.compare_variants(truth, pred1, pred2, lambda v1, v2: v1.matched_with_both_overlaps(v2))
 
+
 def help(argv):
     if len(argv) > 1:
         cmd = argv[-1]

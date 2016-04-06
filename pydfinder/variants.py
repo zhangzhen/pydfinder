@@ -148,7 +148,10 @@ class Variant(object):
         return hash((self.variant_type(), self.pos1, self.pos2))
 
     def __str__(self):
-        return '{}, {}, {}'.format(self.pos1, self.pos2, self.name)
+        return '{}, {}, {}, L:{}'.format(self.pos1, self.pos2, self.name, len(self))
+
+    def __len__(self):
+        return self.pos2.genome_pos.pos - self.pos1.genome_pos.pos - 1
 
     def _genome_region(self):
         return GenomeRegion(self.pos1.genome_pos, self.pos2.genome_pos)
@@ -296,7 +299,11 @@ class SpritesBedpeFile(VariantFile):
                 GenomePositionWithCi(GenomePosition(data[0], int(data[1])+1), Interval(0, delta)),
                 GenomePositionWithCi(GenomePosition(data[3], int(data[4])+1), Interval(0, delta))
             )
-        return NotImplemented
+        return Deletion(
+            data[6],
+            GenomePositionWithCi(GenomePosition(data[0], int(data[2])), Interval(-delta, 0)),
+            GenomePositionWithCi(GenomePosition(data[3], int(data[5])), Interval(-delta, 0))
+        )
 
     def data_to_insertion(self, data):
         pass
